@@ -31,6 +31,13 @@
 
 - `retry()` rewritten: removed dead `return wrapper` (reference to undefined name after an unconditional `while True`); replaced bare `except:` with `except Exception:`; loop now terminates after 15 attempts whether the callback raises or simply never returns the expected value; added `time.sleep(0.1)` between attempts to avoid busy-polling the browser
 
+### GitHub Actions (new)
+
+- Added `.github/workflows/ci.yml` with three jobs:
+  - `install` — matrix over Python 3.10, 3.11, 3.12, 3.13, 3.14; installs the package and verifies the import
+  - `django` — matrix over Django 4.2, 5.2, 6.0; runs `test_django.py` to verify static file discoverability
+  - `selenium` — installs Firefox + geckodriver (latest release auto-detected), runs the full Splinter/Selenium test suite headlessly
+
 ### CI (`gitlab-ci.yml`)
 
 - Added `py310`–`py314` jobs using `python:3.X` official images to verify the package installs cleanly on each supported Python version

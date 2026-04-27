@@ -1,0 +1,60 @@
+name: CI
+
+on:
+  push:
+  pull_request:
+
+jobs:
+  # Verify the package installs cleanly on each supported Python version.
+  install:
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        python-version: ['3.10', '3.11', '3.12', '3.13', '3.14']
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python-version }}
+      - run: pip install -e .[test]
+      - run: python -c "import autocomplete_light"
+
+  # Verify Django static files are discoverable on each supported Django version.
+  django:
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        django-version:
+          - 'django>=4.2,<4.3'
+          - 'django>=5.2,<5.3'
+          - 'django>=6.0,<6.1'
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - run: pip install -e . pytest pytest-django "${{ matrix.django-version }}"
+      - run: pytest test_django.py -v
+
+  # Full Selenium browser tests.
+  selenium:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Install Firefox and geckodriver
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -yqq firefox
+          GECKODRIVER_VERSION=$(curl -s https://api.github.com/repos/mozilla/geckodriver/releases/latest \
+            | python3 -c "import sys,json; print(json.load(sys.stdin)['tag_name'])")
+          curl -sL "https://github.com/mozilla/geckodriver/releases/download/${GECKODRIVER_VERSION}/geckodriver-${GECKODRIVER_VERSION}-linux64.tar.gz" \
+            | sudo tar xz -C /usr/local/bin/
+      - run: pip install -e .[test]
+      - run: pip install https://github.com/pytest-dev/pytest-splinter/archive/master.tar.gz
+      - run: python serve.py &
+      - run: pytest -sv --splinter-headless
