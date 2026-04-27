@@ -76,6 +76,12 @@
     </autocomplete-select-input>
   </autocomplete-select>
 
+  <h2>autocomplete-light minimum-characters=2</h2>
+  <p>Box only appears after typing at least 2 characters.</p>
+  <autocomplete-light id="input-min-chars" url="/" minimum-characters="2">
+    <input slot="input" type="text" />
+  </autocomplete-light>
+
   <h2>autocomplete-select from options</h2>
   <p>Local: it gets its options from introspecting the select tag without a url.</p>
   <p>Change event on vanilla select also works</p>
@@ -105,5 +111,15 @@
 
 <link rel="stylesheet" type="text/css" href="./autocomplete-light.css" />
 <script src="./autocomplete-light.js"></script>
+<script>
+  // Change-event counters used by the Selenium test suite.
+  window.changeCount = {}
+  ;['select-simple', 'select-multiple', 'select-multiple-local'].forEach(function(id) {
+    var el = document.querySelector('#' + id + ' select')
+    if (el) el.addEventListener('change', function() {
+      window.changeCount[id] = (window.changeCount[id] || 0) + 1
+    })
+  })
+</script>
 </body>
 </html>

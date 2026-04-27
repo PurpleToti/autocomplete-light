@@ -38,14 +38,18 @@ jobs:
       - run: pip install -e . pytest pytest-django "${{ matrix.django-version }}"
       - run: pytest test_django.py -v
 
-  # Full Selenium browser tests.
+  # Full Selenium browser tests — run on every supported Python version.
   selenium:
     runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        python-version: ['3.10', '3.11', '3.12', '3.13', '3.14']
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
         with:
-          python-version: '3.12'
+          python-version: ${{ matrix.python-version }}
       - name: Install Firefox and geckodriver
         run: |
           sudo apt-get update -qq

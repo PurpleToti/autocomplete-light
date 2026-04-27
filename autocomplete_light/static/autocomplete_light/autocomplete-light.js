@@ -36,6 +36,10 @@ class AutocompleteLight extends HTMLElement {
   }
 
   onInput() {
+    if (this.input.value.length < this.minimumCharacters) {
+      this.box && this.box.setAttribute('hidden', 'true')
+      return
+    }
     // clear any unsent xhr
     this.xhr && this.xhr.readyState === 0 && this.xhr.abort()
     // clear any planned xhr

@@ -31,6 +31,26 @@
 
 - `retry()` rewritten: removed dead `return wrapper` (reference to undefined name after an unconditional `while True`); replaced bare `except:` with `except Exception:`; loop now terminates after 15 attempts whether the callback raises or simply never returns the expected value; added `time.sleep(0.1)` between attempts to avoid busy-polling the browser
 
+### Tests — new coverage
+
+Previously untested behaviours now covered by Selenium tests:
+
+- **Escape** — typing then pressing Escape hides the box (`test_input_escape`)
+- **Tab commit** — navigating with arrow keys then pressing Tab commits the hilighted choice (`test_input_tab_commit`)
+- **Mouse hilight / leave** — hovering a choice adds the `hilight` class; hovering another removes it (`test_input_mouse_hilight`)
+- **No results** — a query with no matches renders the server's "No result found" message and zero `[data-value]` choices (`test_input_no_results`)
+- **`minimum-characters`** — box stays hidden on focus and on typing below the threshold; appears at the threshold; deleting below the threshold hides it again (`test_input_minimum_characters`)
+- **Resize hides box** — dispatching a `resize` event on `window` hides the open box (`test_input_resize_hides_box`)
+- **`change` event on `<select>` (single)** — unselecting and then selecting a choice each fire a `change` event on the underlying hidden `<select>` (`test_select_change_event`)
+- **`maxChoices` eviction** — calling `choiceSelect()` when single-select is already at capacity evicts the current choice before inserting the new one (`test_select_max_choices_eviction`)
+- **`change` event on `<select>` (multiple, both remote and local variants)** — same event verification for the multi-select case (`test_select_multiple_change_event`)
+
+Also fixed a bug uncovered by writing the `minimum-characters` test: `onInput()` was not checking `minimumCharacters`, so typing even one character would trigger an XHR regardless of the attribute. Now `onInput()` returns early and hides the box when the value is below the threshold.
+
+Added `window.changeCount` instrumentation to `index.html` (used only by the test suite) and a `minimum-characters=2` demo element.
+
+The `selenium` CI job is now a matrix over all five supported Python versions (3.10–3.14).
+
 ### GitHub Actions (new)
 
 - Added `.github/workflows/ci.yml` with three jobs:
