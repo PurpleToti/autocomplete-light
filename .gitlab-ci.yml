@@ -1,12 +1,65 @@
-py-test:
+.selenium-test: &selenium-test
   stage: test
   image: yourlabs/python-arch
   script:
   - pacman -Syu --noconfirm geckodriver firefox
-  - pip install selenium
+  - pip install -e .[test]
   - pip install https://github.com/pytest-dev/pytest-splinter/archive/master.tar.gz
   - python serve.py &
   - py.test -sv --splinter-headless
+
+selenium-test:
+  <<: *selenium-test
+
+# Verify the package installs cleanly on each supported Python version.
+.py-install: &py-install
+  stage: test
+  script:
+  - pip install -e .[test]
+  - python -c "import autocomplete_light"
+
+py310:
+  <<: *py-install
+  image: python:3.10
+
+py311:
+  <<: *py-install
+  image: python:3.11
+
+py312:
+  <<: *py-install
+  image: python:3.12
+
+py313:
+  <<: *py-install
+  image: python:3.13
+
+py314:
+  <<: *py-install
+  image: python:3.14
+
+# Verify the Django app and static files work on each supported Django version.
+.django-compat: &django-compat
+  stage: test
+  image: python:3.12
+  script:
+  - pip install -e . pytest pytest-django $DJANGO_VERSION
+  - pytest test_django.py -v
+
+django-42:
+  <<: *django-compat
+  variables:
+    DJANGO_VERSION: "django>=4.2,<4.3"
+
+django-52:
+  <<: *django-compat
+  variables:
+    DJANGO_VERSION: "django>=5.2,<5.3"
+
+django-60:
+  <<: *django-compat
+  variables:
+    DJANGO_VERSION: "django>=6.0,<6.1"
 
 pages:
   stage: deploy
@@ -14,7 +67,8 @@ pages:
   script:
   - sed -i 's@<head>@<head><base href="/autocomplete-light/">@' index.html
   - mkdir public
-  - mv index.html autocomplete-light.js autocomplete-light.css public/
+  - mv index.html public/
+  - cp autocomplete_light/static/autocomplete_light/autocomplete-light.{js,css} public/
   artifacts:
     paths:
     - public
@@ -25,9 +79,5 @@ pages:
 pypi:
   image: yourlabs/python
   stage: deploy
-  script: |
-    mkdir -p autocomplete_light/static/autocomplete_light
-    cp autocomplete-light.{js,css} autocomplete_light/static/autocomplete_light
-    touch autocomplete_light/__init__.py
-    pypi-release
+  script: pypi-release
   only: [tags]

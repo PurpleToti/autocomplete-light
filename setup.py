@@ -1,22 +1,43 @@
-from setuptools import setup
+from setuptools import setup, find_packages
 
 
 setup(
     name='autocomplete-light',
     versioning='dev',
     setup_requires='setupmeta',
+    packages=find_packages(),
+    package_data={
+        'autocomplete_light': ['static/autocomplete_light/*'],
+    },
     extras_require=dict(
         test=[
             'pytest',
             'pytest-cov',
             'pytest-splinter',
+            'selenium',
+        ],
+        django=[
+            'django>=4.2',
         ],
     ),
     author='James Pic',
     author_email='jamespic@gmail.com',
     url='https://yourlabs.io/oss/autocomplete-light',
-    include_package_data=True,
     license='MIT',
     keywords='html autocomplete',
-    python_requires='>=3.8',
+    python_requires='>=3.10',
+    classifiers=[
+        'Programming Language :: Python :: 3',
+        'Programming Language :: Python :: 3.10',
+        'Programming Language :: Python :: 3.11',
+        'Programming Language :: Python :: 3.12',
+        'Programming Language :: Python :: 3.13',
+        'Programming Language :: Python :: 3.14',
+        'Framework :: Django',
+        'Framework :: Django :: 4.2',
+        'Framework :: Django :: 5.2',
+        'Framework :: Django :: 6.0',
+        'License :: OSI Approved :: MIT License',
+        'Topic :: Internet :: WWW/HTTP',
+    ],
 )

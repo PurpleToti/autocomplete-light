@@ -2,16 +2,13 @@ class AutocompleteLight extends HTMLElement {
   box = null
   xhr = null
   timeoutId = null
-  input = null
-  box = null
 
-  get input() {
-    return this.querySelector('autocomplete-light')
-  }
-
-  connectedCallback() {
+  connectedCallback(retries = 20) {
     this.input = this.querySelector('[slot=input]')
-    if (!this.input) return setTimeout(this.connectedCallback.bind(this), 100)
+    if (!this.input) {
+      if (retries > 0) setTimeout(() => this.connectedCallback(retries - 1), 100)
+      return
+    }
 
     this.input.addEventListener(
       'focus',
@@ -38,20 +35,12 @@ class AutocompleteLight extends HTMLElement {
     }
   }
 
-  disconnectedCallback() {
-    console.log('disconnected')
-  }
-
-  attributeChangedCallback(attrName, oldVal, newVal) {
-    console.log('changed')
-  }
-
   onInput() {
-    // clear any unset xhr
+    // clear any unsent xhr
     this.xhr && this.xhr.readyState === 0 && this.xhr.abort()
     // clear any planned xhr
     this.timeoutId && window.clearTimeout(this.timeoutId)
-    // plan an xhr
+    // debounce: 200ms
     this.timeoutId = window.setTimeout(this.download.bind(this), 200)
   }
 
@@ -61,16 +50,10 @@ class AutocompleteLight extends HTMLElement {
   }
 
   selectChoice(choice) {
-    let eventName = 'autocompleteChoiceSelected'
-    let data = {choice}
-    if (window.CustomEvent && typeof window.CustomEvent === 'function') {
-      var event = new CustomEvent(eventName, {detail: data});
-      this.dispatchEvent(event)
-    } else {
-      var event2 = document.createEvent('CustomEvent');
-      event2.initCustomEvent(eventName, true, true, data);
-      this.dispatchEvent(event2)
-    }
+    this.dispatchEvent(new CustomEvent('autocompleteChoiceSelected', {
+      detail: {choice},
+      bubbles: true,
+    }))
     this.box.setAttribute('hidden', 'true')
   }
 
@@ -86,28 +69,25 @@ class AutocompleteLight extends HTMLElement {
   }
 
   keyboard(ev) {
-    switch(ev.keyCode) {
-      // with Webkit, both keyCode and charCode are set to 38/40 for &/(.
-      // charCode is 0 for arrow keys.
-      // Ref: http://stackoverflow.com/a/12046935/15690
-      case 40: // down arrow
-      case 38: // up arrow
-        // Avoid moving the cursor in the input.
+    switch(ev.key) {
+      // Prevent cursor movement in input on arrow keys.
+      case 'ArrowDown':
+      case 'ArrowUp':
         ev.preventDefault()
         ev.stopPropagation()
-        this.move(ev.keyCode == 38 ? 'up' : 'down');
-        break;
+        this.move(ev.key === 'ArrowUp' ? 'up' : 'down')
+        break
 
-      case 9:  // tab
-      case 13: // enter
+      case 'Tab':
+      case 'Enter':
         if (this.box.getAttribute('hidden')) return
 
-        var choice = this.box.querySelector('.hilight');
+        var choice = this.box.querySelector('.hilight')
 
         if (!choice) {
-            // Don't get in the way, let the browser submit form or focus
-            // on next element.
-            return
+          // Don't get in the way, let the browser submit form or focus
+          // on next element.
+          return
         }
 
         ev.preventDefault()
@@ -116,32 +96,25 @@ class AutocompleteLight extends HTMLElement {
         this.selectChoice(choice)
         break
 
-      case 27: // escape
+      case 'Escape':
         this.box.setAttribute('hidden', 'true')
         break
     }
   }
 
   move(way) {
-    // If the autocomplete should not be displayed then return.
-    if (this.input.value.length < this.minimumCharacters) return true;
+    if (this.input.value.length < this.minimumCharacters) return true
 
-    // The current choice if any.
-    var current = this.box.querySelector('.hilight');
+    var current = this.box.querySelector('.hilight')
 
-    // The first and last choices. If the user presses down on the last
-    // choice, then the first one will be hilighted.
-    var first = this.choices[0];
-    var last = this.choices[this.choices.length - 1];
+    // First and last choices for wrap-around navigation.
+    var first = this.choices[0]
+    var last = this.choices[this.choices.length - 1]
 
-    // The choice that should be hilighted after the move.
-    var target;
+    var target
 
-    // The autocomplete must be shown so that the user sees what choice
-    // he is hilighting.
     this.draw()
 
-    // If a choice is currently hilighted:
     if (current) {
       if (way === 'up') {
         var next = this.choices.indexOf(current) - 1
@@ -151,7 +124,7 @@ class AutocompleteLight extends HTMLElement {
         target = next >= this.choices.length ? first : this.choices[next]
       }
     } else {
-      target = way === 'up' ? last : first;
+      target = way === 'up' ? last : first
     }
 
     target !== undefined && this.hilight(target)
@@ -177,25 +150,15 @@ class AutocompleteLight extends HTMLElement {
     this.draw()
     this.box.innerHTML = ev.target.response
     this.box.querySelectorAll(this.choiceSelector).forEach((item) => {
-      // item idempotence
       if (item.getAttribute('data-bound'))
         return
 
-      // bind mouse events
-      item.addEventListener(
-        'mouseenter',
-        (ev) => this.hilight(ev.target)
-      )
-      item.addEventListener(
-        'mouseleave',
-        (ev) => ev.target.classList.remove('hilight')
-      )
-      item.addEventListener(
-        'mousedown',
-        (ev) => this.selectChoice(ev.target)
-      )
+      item.addEventListener('mouseenter', (ev) => this.hilight(ev.target))
+      item.addEventListener('mouseleave', (ev) => ev.target.classList.remove('hilight'))
+      // mousedown fires before blur/focusout, so the box stays visible long
+      // enough to register the click before hiding.
+      item.addEventListener('mousedown', (ev) => this.selectChoice(ev.target))
 
-      // idempotence mark
       item.setAttribute('data-bound', 'true')
     })
   }
@@ -205,15 +168,8 @@ class AutocompleteLight extends HTMLElement {
     this.box.classList.add('autocomplete-light-box')
     document.querySelector('body').appendChild(this.box)
 
-
-    this.input.addEventListener(
-      'focusout',
-      () => this.box.setAttribute('hidden', 'true')
-    )
-    this.input.addEventListener(
-      'blur',
-      () => this.box.setAttribute('hidden', 'true')
-    )
+    this.input.addEventListener('focusout', () => this.box.setAttribute('hidden', 'true'))
+    this.input.addEventListener('blur', () => this.box.setAttribute('hidden', 'true'))
   }
 
   draw() {
@@ -243,7 +199,7 @@ class AutocompleteSelectInput extends AutocompleteLight {
       return super.download()
     }
 
-    // No URL ? Try to receive from option tags of parent node
+    // No URL: filter local <option> tags instead of fetching from server.
     this.receive({
       target: {
         response: Array.from(
@@ -255,18 +211,17 @@ class AutocompleteSelectInput extends AutocompleteLight {
         ).join('\n'),
       }
     })
-
   }
 }
 
+
 class AutocompleteSelect extends HTMLElement {
   maxChoices = 0
-  bound = false
-  name = null
 
-  connectedCallback() {
+  connectedCallback(retries = 20) {
     if (!this.select || !this.input.input) {
-      return setTimeout(this.connectedCallback.bind(this), 100)
+      if (retries > 0) setTimeout(() => this.connectedCallback(retries - 1), 100)
+      return
     }
 
     if (!this.select.multiple) {
@@ -298,10 +253,10 @@ class AutocompleteSelect extends HTMLElement {
     Array.from(
       this.deck.querySelectorAll('[data-value]')
     ).map((choice) => {
-        if (!this.select.querySelector('option[value="' + choice.getAttribute('data-value') + '"]')) {
-          this.choiceSelect(choice, false)
-        }
-        this.addClear(choice)
+      if (!this.select.querySelector('option[value="' + choice.getAttribute('data-value') + '"]')) {
+        this.choiceSelect(choice, false)
+      }
+      this.addClear(choice)
     })
 
     this.setAttribute('data-bound', 'true')
@@ -343,7 +298,6 @@ class AutocompleteSelect extends HTMLElement {
     }
 
     if (!this.selected.length) {
-      // clear select value
       this.select.value = ''
     }
 
@@ -353,20 +307,18 @@ class AutocompleteSelect extends HTMLElement {
     this.changeTrigger()
   }
 
-  choiceSelect(choice, trigger=true, option=false) {
+  choiceSelect(choice, trigger = true) {
     if (this.maxChoices && this.selected.length >= this.maxChoices) {
       this.choiceUnselect(this.selected[0], true)
     }
 
     var value = choice.getAttribute('data-value')
 
-    // update select value
     if (!this.select.multiple) {
       this.select.value = value
     }
 
-    // insert option in select if not present
-    option = this.select.querySelector('option[value="' + value + '"]')
+    var option = this.select.querySelector('option[value="' + value + '"]')
     if (!option) {
       option = document.createElement('option')
       option.setAttribute('value', value)
@@ -375,9 +327,8 @@ class AutocompleteSelect extends HTMLElement {
     }
     option.setAttribute('selected', 'selected')
 
-    // insert choice on deck if not present, based on a choice node clone
     if (!this.deck.querySelector('[data-value="' + value + '"]')) {
-      choice = choice.cloneNode(9)
+      choice = choice.cloneNode(true)
       choice.classList.remove('hilight')
       this.addClear(choice)
       this.deck.appendChild(choice)
@@ -400,11 +351,11 @@ class AutocompleteSelect extends HTMLElement {
     var clear = document.createElement('span')
     clear.classList.add('clear')
     clear.addEventListener('click', this.onClearClick.bind(this))
-    clear.innerHTML = '❌'
+    clear.innerHTML = '&#10060;'
     choice.appendChild(clear)
   }
 }
 
-window.customElements.define('autocomplete-light', AutocompleteLight);
-window.customElements.define('autocomplete-select-input', AutocompleteSelectInput);
-window.customElements.define('autocomplete-select', AutocompleteSelect);
+window.customElements.define('autocomplete-light', AutocompleteLight)
+window.customElements.define('autocomplete-select-input', AutocompleteSelectInput)
+window.customElements.define('autocomplete-select', AutocompleteSelect)

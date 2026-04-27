@@ -7,6 +7,12 @@ from wsgiref.simple_server import make_server
 
 choices = ['aaa', 'aab', 'abb', 'bbb']
 
+# Map URL basenames to their paths inside the package static directory.
+STATIC_FILE_MAP = {
+    'autocomplete-light.js': 'autocomplete_light/static/autocomplete_light/autocomplete-light.js',
+    'autocomplete-light.css': 'autocomplete_light/static/autocomplete_light/autocomplete-light.css',
+}
+
 
 def choices_get(environ):
     data = urllib.parse.parse_qs(environ['QUERY_STRING'])
@@ -29,6 +35,7 @@ def static(environ):
     ctype = 'text/html'
     if len(environ['PATH_INFO']) > 1:
         path = environ['PATH_INFO'][1:]
+        path = STATIC_FILE_MAP.get(path, path)
         if path.endswith('.css'):
             ctype = 'text/css'
         elif path.endswith('.js'):

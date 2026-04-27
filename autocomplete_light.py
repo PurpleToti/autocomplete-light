@@ -4,25 +4,24 @@ Test script helpers in Python.
 Not necessary to run autocomplete-light.js
 """
 
+import time
+
 from selenium.webdriver.common.by import By
 
 
 def retry(cb, *args, expected=None, **kwargs):
-    i = 15
-    while True:
+    for _ in range(15):
         try:
             result = cb(*args, **kwargs)
-        except:
-            if not i:
-                raise
+        except Exception:
+            pass
         else:
             if expected is not None and result == expected:
                 return result
             elif expected is None and result:
                 return result
-
-        i -= 1
-    return wrapper
+        time.sleep(0.1)
+    return cb(*args, **kwargs)
 
 
 class AutocompleteLight:
