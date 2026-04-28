@@ -281,6 +281,109 @@ def test_select_multiple(browser, name):
     ])
 
 
+def test_no_results_custom_text(browser):
+    browser.visit('http://localhost:8000')
+    al = AutocompleteLight(browser, 'input-no-results-custom')
+
+    retry(al.input)
+    al.type('x')  # matches nothing
+
+    assert retry(lambda: 'Nothing here' in al.box().text)
+    # must not fall back to the default label
+    assert retry(lambda: 'No results' not in al.box().text)
+
+
+def test_select_max_choices_attribute(browser):
+    browser.visit('http://localhost:8000')
+    al = AutocompleteSelectMultiple(browser, 'select-max-choices')
+
+    # select first choice — input should remain visible (1 < max-choices=2)
+    al.type('a')
+    retry(al.choices)
+    al.choices()[0].click()
+    assert retry(lambda: len(al.selected()) == 1)
+    assert not al.alight().get_property('hidden')
+
+    # select second choice — input must now be hidden (2 >= max-choices=2)
+    al.type('a')
+    retry(al.choices)
+    al.choices()[0].click()
+    assert retry(lambda: len(al.selected()) == 2)
+    assert retry(lambda: al.alight().get_property('hidden'))
+
+    # programmatically select a third — component must evict the first
+    browser.evaluate_script('''
+        var div = document.createElement("div")
+        div.setAttribute("data-value", "2")
+        div.textContent = "abb"
+        document.getElementById("select-max-choices").choiceSelect(div)
+    ''')
+    assert retry(lambda: len(al.selected()) == 2)
+
+
+def test_create_option_click(browser):
+    browser.visit('http://localhost:8000')
+    al = AutocompleteLight(browser, 'input-create')
+
+    retry(al.input)
+    al.type('x')  # no regular matches — box has only the create option
+
+    assert retry(lambda: al.box().find_element(By.CSS_SELECTOR, '[data-create]'))
+
+    # dispatch mousedown directly; avoids stale-element issues after the
+    # handler hides the box and the Selenium click sequence continues.
+    browser.evaluate_script(
+        'document.querySelector("[data-create]")'
+        '.dispatchEvent(new MouseEvent("mousedown", {bubbles: true, cancelable: true}))'
+    )
+
+    events = lambda: browser.evaluate_script('window.createEvents')
+    assert retry(lambda: len(events()) > 0)
+    assert events()[-1] == 'x'
+
+
+def test_create_option_keyboard(browser):
+    browser.visit('http://localhost:8000')
+    al = AutocompleteLight(browser, 'input-create')
+
+    retry(al.input)
+    al.type('x')  # 0 regular choices + 1 [data-create]
+
+    # single DOWN should land on the create item
+    al.type(Keys.DOWN)
+    hilighted = retry(lambda: al.box().find_element(By.CSS_SELECTOR, '.hilight'))
+    assert hilighted.get_attribute('data-create') == 'true'
+
+    al.type(Keys.ENTER)
+
+    events = lambda: browser.evaluate_script('window.createEvents')
+    assert retry(lambda: len(events()) > 0)
+    assert events()[-1] == 'x'
+
+
+def test_pagination(browser):
+    browser.visit('http://localhost:8000')
+    al = AutocompleteLight(browser, 'input-paginated')
+
+    inpt = retry(al.input)
+    inpt.click()  # focus triggers onInput() → fetches page 1
+
+    # page 1 returns 2 choices + a [data-next-page] sentinel
+    box = retry(al.box)
+    assert retry(lambda: len(al.choices()) == 2)
+    assert retry(lambda: box.find_element(By.CSS_SELECTOR, '[data-next-page]'))
+
+    # dispatch mousedown on the sentinel (it removes itself, so avoid stale refs)
+    browser.evaluate_script(
+        'document.querySelector("[data-next-page]")'
+        '.dispatchEvent(new MouseEvent("mousedown", {bubbles: true, cancelable: true}))'
+    )
+
+    # after page 2 loads, box should have all 4 choices and no sentinel
+    assert retry(lambda: len(al.choices()) == 4)
+    assert not browser.evaluate_script('document.querySelector("[data-next-page]")')
+
+
 @pytest.mark.parametrize('name', [
     'select-multiple',
     'select-multiple-local',

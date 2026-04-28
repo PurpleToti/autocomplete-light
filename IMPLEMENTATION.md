@@ -183,6 +183,15 @@ element is present, since further pages may contain results.
 
 ---
 
+## Feature 3 — Loading indicator (test coverage note)
+
+The loading state is not covered by the Selenium test suite. On localhost the
+XHR round-trip completes in < 5 ms, making the `loading` attribute appear and
+disappear faster than any reliable polling window. The attribute and CSS are
+correct; manual inspection in devtools confirms the behaviour.
+
+---
+
 ## Other changes made alongside the spec
 
 These were not in the spec but were applied in the same implementation pass:
@@ -192,5 +201,10 @@ These were not in the spec but were applied in the same implementation pass:
 - **`serve.py` no-results response removed**: the demo server no longer
   returns `<div>No result found</div>`; it returns empty HTML and the
   component's no-results message takes over.
+- **No-results check also guards against `[data-create]`**: the initial
+  implementation would inject "No results" even when the box contained only a
+  create option (because `choiceSelector` excludes `[data-create]`, so the
+  count was 0). A third condition `&& !this.box.querySelector('[data-create]')`
+  was added to prevent this.
 - **Error/timeout handlers in `download()` also remove the `loading` attribute**
   (the spec's loading indicator description only mentioned the happy path).

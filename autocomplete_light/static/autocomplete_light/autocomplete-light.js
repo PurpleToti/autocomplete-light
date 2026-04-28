@@ -207,7 +207,8 @@ class AutocompleteLight extends HTMLElement {
     // Client-side no-results message when server returns an empty fragment
     // and there is no pagination sentinel (which implies more results exist).
     if (this.box.querySelectorAll(this.choiceSelector).length === 0
-        && !this.box.querySelector('[data-next-page]')) {
+        && !this.box.querySelector('[data-next-page]')
+        && !this.box.querySelector('[data-create]')) {
       const el = document.createElement('div')
       el.className = 'autocomplete-light-no-results'
       el.textContent = this.getAttribute('no-results-text') || 'No results'

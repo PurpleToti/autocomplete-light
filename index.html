@@ -104,6 +104,37 @@
     })
   </script>
 
+  <h2>autocomplete-light no-results-text</h2>
+  <p>Custom message when no results match (type "x").</p>
+  <autocomplete-light id="input-no-results-custom" url="/" no-results-text="Nothing here">
+    <input slot="input" type="text" />
+  </autocomplete-light>
+
+  <h2>autocomplete-select max-choices=2</h2>
+  <p>Multiple select capped at 2 simultaneous choices.</p>
+  <autocomplete-select multiple id="select-max-choices" max-choices="2">
+    <select slot="select" name="max-choices-demo" multiple></select>
+    <div slot="deck"></div>
+    <autocomplete-select-input slot="input" url="/">
+      <input slot="input" type="text" />
+    </autocomplete-select-input>
+  </autocomplete-select>
+
+  <h2>autocomplete-light with create option</h2>
+  <p>
+    Server returns a <code>[data-create]</code> element; the component
+    fires an <code>autocompleteCreate</code> event instead of POSTing.
+  </p>
+  <autocomplete-light id="input-create" url="/create/">
+    <input slot="input" type="text" />
+  </autocomplete-light>
+
+  <h2>autocomplete-light with pagination</h2>
+  <p>Server returns 2 results per page; click "Load more" to append the next page.</p>
+  <autocomplete-light id="input-paginated" url="/page/">
+    <input slot="input" type="text" />
+  </autocomplete-light>
+
   <h2>form submission</h2>
   <p>Click this button to display form data in GET</p>
   <input type="submit" />
@@ -119,6 +150,12 @@
     if (el) el.addEventListener('change', function() {
       window.changeCount[id] = (window.changeCount[id] || 0) + 1
     })
+  })
+
+  // autocompleteCreate events used by the Selenium test suite.
+  window.createEvents = []
+  document.querySelector('#input-create').addEventListener('autocompleteCreate', function(ev) {
+    window.createEvents.push(ev.detail.value)
   })
 </script>
 </body>
