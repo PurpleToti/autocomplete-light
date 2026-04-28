@@ -226,12 +226,12 @@ def test_select_max_choices_eviction(browser):
 
     # programmatically select a second choice while at capacity (maxChoices=1);
     # the component should evict the current selection automatically
-    browser.evaluate_script('''
+    browser.evaluate_script('''(function() {
         var div = document.createElement("div")
         div.setAttribute("data-value", "2")
         div.textContent = "abb"
         document.getElementById("select-simple").choiceSelect(div)
-    ''')
+    })()''')
 
     al.assert_selected('abb', 2)
 
@@ -248,6 +248,7 @@ def test_select_multiple(browser, name):
 
     # ensure selected choices are hidden
     al.focus()
+    retry(al.choices)
     assert not any([
         choice.text in ('aaa', 'bbb')
         for choice in al.choices()
@@ -275,6 +276,7 @@ def test_select_multiple(browser, name):
 
     # ensure selected choices are hidden
     al.focus()
+    retry(al.choices)
     assert not any([
         choice.text in ('bbb', 'abb')
         for choice in al.choices()
@@ -295,29 +297,40 @@ def test_no_results_custom_text(browser):
 
 def test_select_max_choices_attribute(browser):
     browser.visit('http://localhost:8000')
+    browser.evaluate_script('document.getElementById("select-max-choices").scrollIntoView()')
     al = AutocompleteSelectMultiple(browser, 'select-max-choices')
 
     # select first choice — input should remain visible (1 < max-choices=2)
+    # 'a' matches aaa/aab/abb (3 choices, none excluded yet)
     al.type('a')
-    retry(al.choices)
-    al.choices()[0].click()
+    assert retry(lambda: len(al.choices()) == 3)
+    browser.evaluate_script(
+        'document.getElementById("select-max-choices").input.box'
+        '.querySelector("[data-value]")'
+        '.dispatchEvent(new MouseEvent("mousedown", {bubbles: true, cancelable: true}))'
+    )
     assert retry(lambda: len(al.selected()) == 1)
     assert not al.alight().get_property('hidden')
 
     # select second choice — input must now be hidden (2 >= max-choices=2)
-    al.type('a')
-    retry(al.choices)
-    al.choices()[0].click()
+    # type 'b' (input is now 'ab') → server returns abb (1 choice, excluding the first pick)
+    al.type('b')
+    assert retry(lambda: len(al.choices()) == 1)
+    browser.evaluate_script(
+        'document.getElementById("select-max-choices").input.box'
+        '.querySelector("[data-value]")'
+        '.dispatchEvent(new MouseEvent("mousedown", {bubbles: true, cancelable: true}))'
+    )
     assert retry(lambda: len(al.selected()) == 2)
     assert retry(lambda: al.alight().get_property('hidden'))
 
-    # programmatically select a third — component must evict the first
-    browser.evaluate_script('''
+    # programmatically select a third (aab, value 1) — component must evict aaa
+    browser.evaluate_script('''(function() {
         var div = document.createElement("div")
-        div.setAttribute("data-value", "2")
-        div.textContent = "abb"
+        div.setAttribute("data-value", "1")
+        div.textContent = "aab"
         document.getElementById("select-max-choices").choiceSelect(div)
-    ''')
+    })()''')
     assert retry(lambda: len(al.selected()) == 2)
 
 
