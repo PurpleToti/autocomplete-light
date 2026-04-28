@@ -10,16 +10,22 @@ class AutocompleteLight extends HTMLElement {
       return
     }
 
+    this.input.setAttribute('aria-haspopup', 'listbox')
+    this.input.setAttribute('aria-autocomplete', 'list')
+    this.input.setAttribute('aria-expanded', 'false')
+
     this.input.addEventListener(
       'focus',
       () => this.input.value.length >= this.minimumCharacters && this.onInput()
     )
     this.input.addEventListener('keydown', this.keyboard.bind(this))
     this.input.addEventListener('input', this.onInput.bind(this))
-    window.addEventListener(
-      'resize',
-      () => this.box && this.box.setAttribute('hidden', 'true')
-    )
+    window.addEventListener('resize', () => {
+      if (this.box) {
+        this.box.setAttribute('hidden', 'true')
+        this.input.setAttribute('aria-expanded', 'false')
+      }
+    })
     this.setAttribute('data-bound', 'true')
   }
 
@@ -38,6 +44,7 @@ class AutocompleteLight extends HTMLElement {
   onInput() {
     if (this.input.value.length < this.minimumCharacters) {
       this.box && this.box.setAttribute('hidden', 'true')
+      this.input.setAttribute('aria-expanded', 'false')
       return
     }
     // clear any unsent xhr
@@ -49,8 +56,12 @@ class AutocompleteLight extends HTMLElement {
   }
 
   hilight(choice) {
-    this.selected.forEach((item) => item.classList.remove('hilight'))
+    this.selected.forEach((item) => {
+      item.classList.remove('hilight')
+      item.setAttribute('aria-selected', 'false')
+    })
     choice.classList.add('hilight')
+    choice.setAttribute('aria-selected', 'true')
   }
 
   selectChoice(choice) {
@@ -59,6 +70,7 @@ class AutocompleteLight extends HTMLElement {
       bubbles: true,
     }))
     this.box.setAttribute('hidden', 'true')
+    this.input.setAttribute('aria-expanded', 'false')
   }
 
   get url() {
@@ -67,7 +79,10 @@ class AutocompleteLight extends HTMLElement {
 
   download() {
     this.xhr = new XMLHttpRequest()
+    this.xhr.timeout = 5000
     this.xhr.addEventListener('load', this.receive.bind(this))
+    this.xhr.addEventListener('error', () => this.box && this.box.setAttribute('hidden', 'true'))
+    this.xhr.addEventListener('timeout', () => this.box && this.box.setAttribute('hidden', 'true'))
     this.xhr.open('GET', this.url)
     this.xhr.send()
   }
@@ -102,6 +117,7 @@ class AutocompleteLight extends HTMLElement {
 
       case 'Escape':
         this.box.setAttribute('hidden', 'true')
+        this.input.setAttribute('aria-expanded', 'false')
         break
     }
   }
@@ -151,14 +167,21 @@ class AutocompleteLight extends HTMLElement {
   }
 
   receive(ev) {
+    // ev.target.status is undefined for local (non-XHR) calls; skip check in that case.
+    if (ev.target.status && !(ev.target.status >= 200 && ev.target.status < 300)) return
     this.draw()
     this.box.innerHTML = ev.target.response
     this.box.querySelectorAll(this.choiceSelector).forEach((item) => {
       if (item.getAttribute('data-bound'))
         return
 
+      item.setAttribute('role', 'option')
+      item.setAttribute('aria-selected', 'false')
       item.addEventListener('mouseenter', (ev) => this.hilight(ev.target))
-      item.addEventListener('mouseleave', (ev) => ev.target.classList.remove('hilight'))
+      item.addEventListener('mouseleave', (ev) => {
+        ev.target.classList.remove('hilight')
+        ev.target.setAttribute('aria-selected', 'false')
+      })
       // mousedown fires before blur/focusout, so the box stays visible long
       // enough to register the click before hiding.
       item.addEventListener('mousedown', (ev) => this.selectChoice(ev.target))
@@ -170,10 +193,15 @@ class AutocompleteLight extends HTMLElement {
   boxBuild() {
     this.box = document.createElement('div')
     this.box.classList.add('autocomplete-light-box')
+    this.box.setAttribute('role', 'listbox')
     document.querySelector('body').appendChild(this.box)
 
-    this.input.addEventListener('focusout', () => this.box.setAttribute('hidden', 'true'))
-    this.input.addEventListener('blur', () => this.box.setAttribute('hidden', 'true'))
+    const hideBox = () => {
+      this.box.setAttribute('hidden', 'true')
+      this.input.setAttribute('aria-expanded', 'false')
+    }
+    this.input.addEventListener('focusout', hideBox)
+    this.input.addEventListener('blur', hideBox)
   }
 
   draw() {
@@ -184,6 +212,7 @@ class AutocompleteLight extends HTMLElement {
     // keep some space for the border, avoid overflow on x
     this.box.style.width = rect.width - 2 + 'px'
     this.box.removeAttribute('hidden')
+    this.input.setAttribute('aria-expanded', 'true')
   }
 }
 

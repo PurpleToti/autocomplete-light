@@ -132,13 +132,15 @@ def test_input_minimum_characters(browser):
     inpt = retry(al.input)
     inpt.click()
 
-    # focus alone must not open the box (value length 0 < minimum 2)
-    time.sleep(0.5)
+    # focus alone must not open the box (value length 0 < minimum 2).
+    # onInput() returns synchronously without debouncing, but we still need to
+    # give the browser event loop a moment to flush before asserting absence.
+    time.sleep(0.3)
     assert not al.box()
 
     # one character must not open the box
     al.type('a')
-    time.sleep(0.5)
+    time.sleep(0.3)
     assert not al.box() or al.box().get_property('hidden')
 
     # two characters must open the box ('aa' matches 'aaa' and 'aab')
