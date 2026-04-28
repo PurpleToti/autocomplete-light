@@ -26,8 +26,6 @@ def choices_get(environ):
         if choice.startswith(q)
         and str(i) not in selected
     ])
-    if not html:
-        html = '<div>No result found</div>'
     return html, 'text/html'
 
 

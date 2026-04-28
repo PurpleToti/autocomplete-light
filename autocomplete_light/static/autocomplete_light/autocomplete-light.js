@@ -56,7 +56,8 @@ class AutocompleteLight extends HTMLElement {
   }
 
   hilight(choice) {
-    this.selected.forEach((item) => {
+    // Use .hilight directly so [data-create] items also get cleared.
+    this.box.querySelectorAll('.hilight').forEach((item) => {
       item.classList.remove('hilight')
       item.setAttribute('aria-selected', 'false')
     })
@@ -73,16 +74,32 @@ class AutocompleteLight extends HTMLElement {
     this.input.setAttribute('aria-expanded', 'false')
   }
 
+  handleCreate() {
+    this.dispatchEvent(new CustomEvent('autocompleteCreate', {
+      detail: {value: this.input.value},
+      bubbles: true,
+    }))
+    this.box.setAttribute('hidden', 'true')
+    this.input.setAttribute('aria-expanded', 'false')
+  }
+
   get url() {
     return this.getAttribute('url') + '?q=' + this.input.value
   }
 
   download() {
+    this.setAttribute('loading', '')
     this.xhr = new XMLHttpRequest()
     this.xhr.timeout = 5000
     this.xhr.addEventListener('load', this.receive.bind(this))
-    this.xhr.addEventListener('error', () => this.box && this.box.setAttribute('hidden', 'true'))
-    this.xhr.addEventListener('timeout', () => this.box && this.box.setAttribute('hidden', 'true'))
+    this.xhr.addEventListener('error', () => {
+      this.removeAttribute('loading')
+      this.box && this.box.setAttribute('hidden', 'true')
+    })
+    this.xhr.addEventListener('timeout', () => {
+      this.removeAttribute('loading')
+      this.box && this.box.setAttribute('hidden', 'true')
+    })
     this.xhr.open('GET', this.url)
     this.xhr.send()
   }
@@ -112,7 +129,11 @@ class AutocompleteLight extends HTMLElement {
         ev.preventDefault()
         ev.stopPropagation()
 
-        this.selectChoice(choice)
+        if (choice.getAttribute('data-create')) {
+          this.handleCreate()
+        } else {
+          this.selectChoice(choice)
+        }
         break
 
       case 'Escape':
@@ -126,10 +147,11 @@ class AutocompleteLight extends HTMLElement {
     if (this.input.value.length < this.minimumCharacters) return true
 
     var current = this.box.querySelector('.hilight')
+    var choices = this.navigationChoices
 
     // First and last choices for wrap-around navigation.
-    var first = this.choices[0]
-    var last = this.choices[this.choices.length - 1]
+    var first = choices[0]
+    var last = choices[choices.length - 1]
 
     var target
 
@@ -137,11 +159,11 @@ class AutocompleteLight extends HTMLElement {
 
     if (current) {
       if (way === 'up') {
-        var next = this.choices.indexOf(current) - 1
-        target = next < 0 ? last : this.choices[next]
+        var next = choices.indexOf(current) - 1
+        target = next < 0 ? last : choices[next]
       } else {
-        var next = this.choices.indexOf(current) + 1
-        target = next >= this.choices.length ? first : this.choices[next]
+        var next = choices.indexOf(current) + 1
+        target = next >= choices.length ? first : choices[next]
       }
     } else {
       target = way === 'up' ? last : first
@@ -154,12 +176,20 @@ class AutocompleteLight extends HTMLElement {
     return Array.from(this.box.querySelectorAll(this.choiceSelector))
   }
 
+  // Includes [data-create] items for arrow-key navigation; excludes group
+  // headers, [data-next-page], and other non-selectable elements.
+  get navigationChoices() {
+    return Array.from(this.box.querySelectorAll(
+      this.choiceSelector + ', [data-create]'
+    ))
+  }
+
   get selected() {
     return this.box.querySelectorAll(this.choiceSelector + '.hilight')
   }
 
   get choiceSelector() {
-    return this.getAttribute('choice-selector') || '[data-value]'
+    return this.getAttribute('choice-selector') || '[data-value]:not([data-create])'
   }
 
   get minimumCharacters() {
@@ -169,12 +199,26 @@ class AutocompleteLight extends HTMLElement {
   receive(ev) {
     // ev.target.status is undefined for local (non-XHR) calls; skip check in that case.
     if (ev.target.status && !(ev.target.status >= 200 && ev.target.status < 300)) return
+    this.removeAttribute('loading')
     this.draw()
     this.box.innerHTML = ev.target.response
-    this.box.querySelectorAll(this.choiceSelector).forEach((item) => {
-      if (item.getAttribute('data-bound'))
-        return
+    this.bindBox()
 
+    // Client-side no-results message when server returns an empty fragment
+    // and there is no pagination sentinel (which implies more results exist).
+    if (this.box.querySelectorAll(this.choiceSelector).length === 0
+        && !this.box.querySelector('[data-next-page]')) {
+      const el = document.createElement('div')
+      el.className = 'autocomplete-light-no-results'
+      el.textContent = this.getAttribute('no-results-text') || 'No results'
+      this.box.appendChild(el)
+    }
+  }
+
+  bindBox() {
+    // Regular selectable choices.
+    this.box.querySelectorAll(this.choiceSelector).forEach((item) => {
+      if (item.getAttribute('data-bound')) return
       item.setAttribute('role', 'option')
       item.setAttribute('aria-selected', 'false')
       item.addEventListener('mouseenter', (ev) => this.hilight(ev.target))
@@ -185,9 +229,41 @@ class AutocompleteLight extends HTMLElement {
       // mousedown fires before blur/focusout, so the box stays visible long
       // enough to register the click before hiding.
       item.addEventListener('mousedown', (ev) => this.selectChoice(ev.target))
-
       item.setAttribute('data-bound', 'true')
     })
+
+    // Create-option items — dispatches autocompleteCreate event; no built-in POST.
+    this.box.querySelectorAll('[data-create]').forEach((item) => {
+      if (item.getAttribute('data-bound')) return
+      item.addEventListener('mouseenter', () => item.classList.add('hilight'))
+      item.addEventListener('mouseleave', () => item.classList.remove('hilight'))
+      item.addEventListener('mousedown', () => this.handleCreate())
+      item.setAttribute('data-bound', 'true')
+    })
+
+    // Pagination sentinel — appends next page into the existing box.
+    const nextPageEl = this.box.querySelector('[data-next-page]:not([data-bound])')
+    if (nextPageEl) {
+      nextPageEl.addEventListener('mousedown', (ev) => {
+        // preventDefault keeps focus on the input so the box stays visible
+        // while the next page loads.
+        ev.preventDefault()
+        const page = nextPageEl.getAttribute('data-next-page')
+        nextPageEl.remove()
+        const xhr = new XMLHttpRequest()
+        xhr.timeout = 5000
+        xhr.addEventListener('load', (loadEv) => {
+          if (!(loadEv.target.status >= 200 && loadEv.target.status < 300)) return
+          const tmp = document.createElement('div')
+          tmp.innerHTML = loadEv.target.response
+          while (tmp.firstChild) this.box.appendChild(tmp.firstChild)
+          this.bindBox()
+        })
+        xhr.open('GET', this.getAttribute('url') + '?q=' + this.input.value + '&page=' + page)
+        xhr.send()
+      })
+      nextPageEl.setAttribute('data-bound', 'true')
+    }
   }
 
   boxBuild() {
@@ -256,6 +332,9 @@ class AutocompleteSelect extends HTMLElement {
       if (retries > 0) setTimeout(() => this.connectedCallback(retries - 1), 100)
       return
     }
+
+    const attrMax = parseInt(this.getAttribute('max-choices'))
+    this.maxChoices = isNaN(attrMax) ? 0 : attrMax
 
     if (!this.select.multiple) {
       this.maxChoices = 1
@@ -384,7 +463,7 @@ class AutocompleteSelect extends HTMLElement {
     var clear = document.createElement('span')
     clear.classList.add('clear')
     clear.addEventListener('click', this.onClearClick.bind(this))
-    clear.innerHTML = '&#10060;'
+    clear.textContent = this.getAttribute('clear-text') || '×'
     choice.appendChild(clear)
   }
 }
