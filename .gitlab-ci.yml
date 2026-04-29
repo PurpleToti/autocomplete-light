@@ -83,3 +83,4 @@ pypi:
   stage: deploy
   script: pypi-release
   only: [tags]
+  when: manual
