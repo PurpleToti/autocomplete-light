@@ -2,6 +2,7 @@
   stage: test
   image: yourlabs/python-arch
   script:
+  - sed -i '/^\[community\]/,/^$/d' /etc/pacman.conf
   - pacman -Syu --noconfirm geckodriver firefox
   - pip install -e .[test]
   - pip install https://github.com/pytest-dev/pytest-splinter/archive/master.tar.gz
