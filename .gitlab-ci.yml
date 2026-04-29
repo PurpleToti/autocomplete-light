@@ -1,6 +1,8 @@
 .selenium-test: &selenium-test
   stage: test
   image: archlinux:latest
+  variables:
+    PIP_BREAK_SYSTEM_PACKAGES: "1"
   script:
   - pacman -Syu --noconfirm python python-pip geckodriver firefox
   - pip install -e .[test]
