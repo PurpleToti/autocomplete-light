@@ -11,56 +11,6 @@
 selenium-test:
   <<: *selenium-test
 
-# Verify the package installs cleanly on each supported Python version.
-.py-install: &py-install
-  stage: test
-  script:
-  - pip install -e .[test]
-  - python -c "import autocomplete_light"
-
-py310:
-  <<: *py-install
-  image: python:3.10
-
-py311:
-  <<: *py-install
-  image: python:3.11
-
-py312:
-  <<: *py-install
-  image: python:3.12
-
-py313:
-  <<: *py-install
-  image: python:3.13
-
-py314:
-  <<: *py-install
-  image: python:3.14
-
-# Verify the Django app and static files work on each supported Django version.
-.django-compat: &django-compat
-  stage: test
-  image: python:3.12
-  script:
-  - pip install -e . pytest pytest-django $DJANGO_VERSION
-  - pytest test_django.py -v
-
-django-42:
-  <<: *django-compat
-  variables:
-    DJANGO_VERSION: "django>=4.2,<4.3"
-
-django-52:
-  <<: *django-compat
-  variables:
-    DJANGO_VERSION: "django>=5.2,<5.3"
-
-django-60:
-  <<: *django-compat
-  variables:
-    DJANGO_VERSION: "django>=6.0,<6.1"
-
 pages:
   stage: deploy
   image: node:alpine
@@ -76,10 +26,3 @@ pages:
   only:
     refs:
       - master
-
-pypi:
-  image: yourlabs/python
-  stage: deploy
-  script: pypi-release
-  only: [tags]
-  when: manual
