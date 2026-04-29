@@ -1,10 +1,8 @@
 .selenium-test: &selenium-test
   stage: test
-  image: archlinux:latest
-  variables:
-    PIP_BREAK_SYSTEM_PACKAGES: "1"
+  image: yourlabs/python
   script:
-  - pacman -Syu --noconfirm python python-pip geckodriver firefox
+  - apt-get update -qq && apt-get install -y -qq firefox-esr geckodriver
   - pip install -e .[test]
   - pip install https://github.com/pytest-dev/pytest-splinter/archive/master.tar.gz
   - python serve.py &
