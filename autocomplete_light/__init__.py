@@ -1,8 +1,5 @@
 """
 Browser test helpers for autocomplete-light.
-
-Importing this package in a Django project works fine even without selenium
-installed — the helpers are only exposed when selenium is available.
 """
 
 import time
