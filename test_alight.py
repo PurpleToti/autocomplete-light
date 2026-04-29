@@ -362,6 +362,9 @@ def test_create_option_keyboard(browser):
     retry(al.input)
     al.type('x')  # 0 regular choices + 1 [data-create]
 
+    # wait for the XHR to complete and the create option to appear
+    assert retry(lambda: al.box().find_element(By.CSS_SELECTOR, '[data-create]'))
+
     # single DOWN should land on the create item
     al.type(Keys.DOWN)
     hilighted = retry(lambda: al.box().find_element(By.CSS_SELECTOR, '.hilight'))

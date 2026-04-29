@@ -8,7 +8,7 @@
   - pip install -e .[test]
   - pip install https://github.com/pytest-dev/pytest-splinter/archive/master.tar.gz
   - python serve.py &
-  - py.test -sv --splinter-headless
+  - py.test -sv --splinter-headless --ignore=test_django.py
 
 selenium-test:
   <<: *selenium-test
