@@ -2,7 +2,7 @@
   stage: test
   image: yourlabs/python
   script:
-  - apt-get update -qq && apt-get install -y -qq firefox-esr geckodriver
+  - pacman -Sy --noconfirm firefox geckodriver
   - pip install -e .[test]
   - pip install https://github.com/pytest-dev/pytest-splinter/archive/master.tar.gz
   - python serve.py &
